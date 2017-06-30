@@ -3,6 +3,7 @@ import numpy as np
 from sklearn import svm
 from sklearn.neural_network import MLPClassifier
 from sklearn.externals import joblib
+from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
 import random
 import time
 
@@ -34,6 +35,10 @@ def trainMlpModel(train, size):
     clf.fit(train[:, 1:-1], train[:, -1])
     return clf
 
+def trainRFModel(train):
+    clf = RandomForestClassifier(n_jobs = -1)
+    clf.fit(train[:, 1:-1], train[:, -1])
+    return clf
 
 
 def validModel(valid, clf):
@@ -110,7 +115,8 @@ def writeData(train, valid, train_path, valid_path):
 
 def train_write(train, file_path, size):
     start_time = time.time()
-    clf = trainSvmModel(train)
+    clf = trainRFModel(train)
+        #trainSvmModel(train)
     #trainMlpModel(train, size)
     total_time = time.time() - start_time
     print(total_time)
@@ -146,8 +152,8 @@ def read_data(train_path, valid_path):
 if __name__ == "__main__":
     print()
     #write_data()
-    train, valid = read_data('duplicate_total_train.csv',
-                             'total_valid.csv')
+    train, valid = read_data('filtered/duplicate_total_train.csv',
+                             'filtered/total_valid.csv')
 
     #print(valid)
     print(valid[:, 1:-1].shape)
@@ -155,9 +161,9 @@ if __name__ == "__main__":
     print(train[:, 1:-1].shape)
     countPosNeg(train)
 
-    train_write(train, 'svm_order_duplicate_total.model', 50)
-    #clf = readModel('svm_order_balance.model')
-    #evalModel(clf, valid)
+    #train_write(train, 'model/rf_duplicate_total.model', 50)
+    clf = readModel('model/rf_duplicate_total.model')
+    evalModel(clf, valid)
 
     #(2932, 131835, 2621, 6118)
 
@@ -172,6 +178,9 @@ if __name__ == "__main__":
 
     #3570.64846897
     #(913, 331345, 3279, 1330)
+
+    #(1354, 331149, 3475, 889)
+    #(881, 334162, 462, 1362)
 
 
 
