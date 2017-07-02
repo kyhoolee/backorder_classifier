@@ -6,6 +6,9 @@ from sklearn.externals import joblib
 from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
 import random
 import time
+from sklearn import metrics
+from sklearn.metrics import auc, precision_recall_curve
+import order_preprocess as o_pre
 
 
 def readDataset(train_prob):
@@ -34,6 +37,7 @@ def trainMlpModel(train, size):
     clf = MLPClassifier(solver='lbfgs', alpha=1e-5, hidden_layer_sizes=(size,), random_state=1)
     clf.fit(train[:, 1:-1], train[:, -1])
     return clf
+
 
 def trainRFModel(train):
     clf = RandomForestClassifier(n_jobs = -1)
@@ -81,23 +85,32 @@ def countResult(data, result):
 
     return(truePos, trueNeg, falsePos, falseNeg)
 
+
 def evalResult(truePos, trueNeg, falsePos, falseNeg):
     precision = truePos * 1.0 / (truePos + falsePos)
     recall = truePos * 1.0 / (truePos + falseNeg)
-    print(precision, recall)
+    f_score = (precision*recall) * 2.0 / (precision + recall)
+    print(precision, recall, f_score)
     return (precision, recall)
 
+
 def evalModel(clf, data):
-    result = clf.predict(data[:, 1:-1])
+    result = clf.predict(data[:, 1:22])
     print(result.shape)
     print(result)
     #countResult(data, result)
     truePos, trueNeg, falsePos, falseNeg = countResult(data, result)
-    #evalResult(truePos, trueNeg, falsePos, falseNeg)
+    evalResult(truePos, trueNeg, falsePos, falseNeg)
+
+
+def predict(data, clf):
+    result = clf.predict(data[:, 1:22])
+    return result
 
 
 def writeModel(clf, file_path):
     joblib.dump(clf, file_path)
+
 
 def readModel(file_path):
     clf = joblib.load(file_path)
@@ -108,12 +121,13 @@ def writeNumpy(data, file_path):
     df = pd.DataFrame(data=data)
     df.to_csv(file_path, sep=',', header=False, index=False)
 
+
 def writeData(train, valid, train_path, valid_path):
     writeNumpy(train, train_path)
     writeNumpy(valid, valid_path)
 
 
-def train_write(train, file_path, size):
+def train_write(train, file_path):
     start_time = time.time()
     clf = trainRFModel(train)
         #trainSvmModel(train)
@@ -122,6 +136,7 @@ def train_write(train, file_path, size):
     print(total_time)
 
     writeModel(clf, file_path)
+
 
 def write_data():
     (train, valid) = readDataset(0.1)
@@ -132,6 +147,7 @@ def write_data():
     countPosNeg(valid)
 
     writeData(train, valid, 'backorder_train.txt', 'backorder_valid.txt')
+
 
 def readNumpy(file_path):
     data = pd.read_csv(file_path)
@@ -145,15 +161,93 @@ def read_data(train_path, valid_path):
     return (train, valid)
 
 
+def sample_data(data, neg_prob):
+    result = []
+    for i in range(0, data.shape[0]):
+        if data[i, -1] == 0:
+            prob = random.uniform(0,1)
+            if prob < neg_prob:
+                result.append(data[i])
+        else:
+            result.append(data[i])
+
+    return np.array(result)
 
 
+def duplicate_data(data, pos_times):
+    result = []
+    for i in range(0, data.shape[0]):
+        if data[i, -1] == 1:
+            for t in range(0, pos_times):
+                result.append(data[i])
+        else:
+            result.append(data[i])
+
+    return np.array(result)
 
 
-if __name__ == "__main__":
-    print()
+def plot_roc(valid, clf, model_name):
+    # calculate the fpr and tpr for all thresholds of the classification
+    probs = clf.predict_proba(valid[:, 1:22])
+    preds = probs[:, 1]
+    fpr, tpr, threshold = metrics.roc_curve(valid[:, -1], preds)
+    roc_auc = metrics.auc(fpr, tpr)
+
+    # roc
+    import matplotlib.pyplot as plt
+    plt.title('AUC ' + model_name)
+    plt.plot(fpr, tpr, 'b', label='AUC = %0.2f' % roc_auc)
+    plt.legend(loc='lower right')
+    plt.plot([0, 1], [0, 1], 'r--')
+    plt.xlim([0, 1])
+    plt.ylim([0, 1])
+    plt.ylabel('True Positive Rate')
+    plt.xlabel('False Positive Rate')
+    plt.show()
+
+    # precision-recall-curve
+
+    precision, recall, thresholds = precision_recall_curve(valid[:, -1], preds)
+    area = auc(recall, precision)
+    plt.figure()
+    plt.plot(recall, precision, label='Area Under Curve = %0.3f' % area)
+    plt.legend(loc='lower left')
+    plt.title('Precision-Recall ' + model_name)
+    plt.xlabel('Recall')
+    plt.ylabel('Precision')
+    plt.ylim([0.0, 1.0])
+    plt.xlim([0.0, 1.0])
+    plt.show()
+
+
+def training_from_csv_data(data_file, model_file):
+    data = o_pre.read_data(data_file)
+    train_write(data, model_file)
+
+
+def build_classifier_sample():
+    # write_data()
+    train, valid = read_data('data/d_train_set.csv',
+                             'data/d_valid_set.csv')
+
+    # print(valid)
+    print(valid[:, 1:-1].shape)
+    countPosNeg(valid)
+    print(train[:, 1:-1].shape)
+    countPosNeg(train)
+
+    # sample_train = sample_data(train, 0.1)
+    # countPosNeg(sample_train)
+
+    duplicate_train = duplicate_data(train, 10)
+    countPosNeg(duplicate_train)
+    train_write(duplicate_train, 'model/rf_d_duplicate_10.model')
+
+def eval_result_sample(model_file, model_name):
+
     #write_data()
-    train, valid = read_data('filtered/duplicate_total_train.csv',
-                             'filtered/total_valid.csv')
+    train, valid = read_data('data/d_train_set.csv',
+                             'data/d_valid_set.csv')
 
     #print(valid)
     print(valid[:, 1:-1].shape)
@@ -161,26 +255,21 @@ if __name__ == "__main__":
     print(train[:, 1:-1].shape)
     countPosNeg(train)
 
-    #train_write(train, 'model/rf_duplicate_total.model', 50)
-    clf = readModel('model/rf_duplicate_total.model')
+
+    clf = readModel(model_file)
     evalModel(clf, valid)
+    plot_roc(valid, clf, model_name)
 
-    #(2932, 131835, 2621, 6118)
+def eval_result_rf():
+    eval_result_sample("model/rf_d_duplicate.model", "random forest")
 
-    #(9050, 134456)
 
-    #(2243, 334624)
-    #(160, 332834, 1790, 2083)
-    #(751, 328221, 6403, 1492)
+if __name__ == "__main__":
+    print()
+    eval_result_rf()
 
-    #2500s
-    #(508, 330052, 4572, 1735)
 
-    #3570.64846897
-    #(913, 331345, 3279, 1330)
 
-    #(1354, 331149, 3475, 889)
-    #(881, 334162, 462, 1362)
 
 
 
