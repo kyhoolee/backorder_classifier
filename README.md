@@ -1,9 +1,12 @@
 
 ## Motivation
 
-Random-Forest classifier for classifying backorder data
-The data is imbalance between 2 label
-Duplicating the Positive-label or Re-sampling the Negative-label to get more balance data-set
+*  Random-Forest classifier for classifying backorder data
+*  The data is imbalance between 2 label
+*  Duplicating the Positive-label or Re-sampling the Negative-label to get more balance data-set
+*  Data set [Backorder data](https://www.kaggle.com/tiredgeek/predict-bo-trial)
+
+
 
 ## Installation
 
